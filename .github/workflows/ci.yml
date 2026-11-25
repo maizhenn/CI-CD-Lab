@@ -20,7 +20,6 @@ jobs:
       - name: Run automated tests
         shell: pwsh
         run: |
-          Remove-Item Env:\COMPUTERNAME
           ./Test-System.ps1
 
       - name: Quality gate passed
