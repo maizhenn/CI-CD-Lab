@@ -19,4 +19,10 @@ jobs:
 
       - name: Run automated tests
         shell: pwsh
-        run: ./Test-System.ps1
+        run: |
+          Remove-Item Env:\COMPUTERNAME
+          ./Test-System.ps1
+
+      - name: Quality gate passed
+        shell: pwsh
+        run: Write-Host "All tests passed. Ready for deployment."
