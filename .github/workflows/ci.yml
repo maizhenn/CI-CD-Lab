@@ -16,3 +16,7 @@ jobs:
       - name: Run PowerShell script
         shell: pwsh
         run: ./Check-System.ps1
+
+      - name: Run automated tests
+        shell: pwsh
+        run: ./Test-System.ps1
