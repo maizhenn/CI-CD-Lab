@@ -7,6 +7,9 @@ on:
     branches: [master]
   workflow_dispatch:
 
+permissions:
+  contents: read
+
 jobs:
   test:
     runs-on: windows-latest
@@ -14,6 +17,8 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v7
+        with:
+          persist-credentials: false
 
       - name: Run PowerShell script
         shell: pwsh
@@ -21,9 +26,52 @@ jobs:
 
       - name: Run automated tests
         shell: pwsh
-        run: |
-          ./Test-System.ps1
+        run: ./Test-System.ps1
 
       - name: Quality gate passed
         shell: pwsh
         run: Write-Host "All tests passed. Ready for deployment."
+
+  trigger-cd:
+    needs: test
+    if: github.event_name == 'push' && github.ref == 'refs/heads/master'
+    runs-on: windows-latest
+    environment: cd-trigger
+
+    steps:
+      - name: Trigger Windows CD
+        shell: pwsh
+        env:
+          CD_TRIGGER_TOKEN: ${{ secrets.CD_TRIGGER_TOKEN }}
+          SOURCE_SHA: ${{ github.sha }}
+        run: |
+          $ErrorActionPreference = 'Stop'
+
+          if ([string]::IsNullOrWhiteSpace($env:CD_TRIGGER_TOKEN)) {
+            throw "CD trigger token is missing"
+          }
+
+          $headers = @{
+            Authorization = "Bearer $env:CD_TRIGGER_TOKEN"
+            Accept = "application/vnd.github+json"
+            "X-GitHub-Api-Version" = "2026-03-10"
+          }
+
+          $body = @{
+            ref = "main"
+            inputs = @{
+              source_sha = $env:SOURCE_SHA
+            }
+          } | ConvertTo-Json -Depth 5
+
+          $uri = "https://api.github.com/repos/maizhenn/CI-CD-Deploy/actions/workflows/deploy.yml/dispatches"
+
+          Invoke-RestMethod `
+            -Uri $uri `
+            -Method Post `
+            -Headers $headers `
+            -ContentType "application/json" `
+            -Body $body | Out-Null
+
+          Write-Host "CD TRIGGER SUCCESS"
+          Write-Host "Source commit: $env:SOURCE_SHA"
